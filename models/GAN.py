@@ -18,6 +18,7 @@ class GeneratorNet(nn.Module):
         out = self.layer2(out) 
         return out
 
+
 class DiscriminatorNet(nn.Module):
 
     def __init__(self,input_dim,hidden_dim,output_dim,): 
@@ -34,9 +35,10 @@ class DiscriminatorNet(nn.Module):
         out = self.layer2(out)
         return out
 
+
 class GANmodel: 
 
-    def __init__(self,gan_config):
+    def __init__(self, gan_config):
 
         self.gan_config = gan_config
         self.device = gan_config['device']
@@ -54,19 +56,20 @@ class GANmodel:
         self.d_lr = gan_config['d_lr'] 
         self.epochs = gan_config['epochs'] 
         self.gamma = gan_config['gamma']
-        self.batch_size = gan_config['batch_size'] 
+        self.batch_size = gan_config['batch_size']
 
 
-    def train(self,train_data,validation_data): 
+    def train(self, train_data, validation_data):
 
         # Train data: Torch tensor (n_train x z_dim)
         # validation data: Torch tensor (n_val x z_dim)
-        train_data = train_data.to(self.device)
-        validation_data = validation_data.to(self.device)
+
+        # train_data = train_data.to(self.device)
+        # validation_data = validation_data.to(self.device)
 
         n_train = train_data.shape[0]
         n_valid = validation_data.shape[0]
-        loss_fn = nn.CrossEntropyLoss()
+        loss_fn = nn.BCEWithLogitsLoss()
         g_optimizer = torch.optim.Adam(self.g.parameters(), lr=self.g_lr)
         d_optimizer = torch.optim.Adam(self.d.parameters(), lr=self.d_lr)
         g_scheduler = torch.optim.lr_scheduler.ExponentialLR(g_optimizer, gamma=self.gamma)
@@ -85,28 +88,28 @@ class GANmodel:
             loss_d_val = 0
             loss_g_val = 0
 
-            for batch_start in range(0,n_train, self.batch_size):
+            for batch_start in range(0, n_train, self.batch_size):
 
                 d_optimizer.zero_grad()
                 g_optimizer.zero_grad()
 
                 ###  Update discriminator ### 
-                
-                batch_real = train_data[batch_start : batch_start + self.batch_size]
-                print("Batch real shape: ",batch_real.shape)
-                labels_real = torch.full((self.batch_size,), 1 , device=self.device)
-                
-                batch_fake_data = torch.randn(self.batch_size, self.g.input_dim, device=self.device)
-                labels_fake = torch.full((self.batch_size,), 0 , device=self.device)
+
+                batch_real = train_data[batch_start : batch_start + self.batch_size].to(self.device)
+                # print("Batch real shape: ", batch_real.shape)
+                labels_real = torch.full((len(batch_real), 1), 1., device=self.device)
+
+                batch_fake_data = torch.randn(len(batch_real), self.g.input_dim, device=self.device)
+                labels_fake = torch.full((len(batch_real), 1), 0., device=self.device)
 
                 # TODO : ADD SUPPORT TO SHUFFLE/MIX THE DATA FOR DISCRIMINATOR TRAINING. IS THIS DONE USUALLY? 
                 # TODO: ADD SUPPORT FOR TRAINING SEVERAL STEPS OF DISCRIMINATOR FOR ONE GENERATOR STEP
 
-                with torch.no_grad(): 
+                with torch.no_grad():
                     batch_fake = self.g(batch_fake_data)
 
-                d_output_real = self.d(batch_real) 
-                loss_real_d = loss_fn(d_output_real , labels_real) 
+                d_output_real = self.d(batch_real)
+                loss_real_d = loss_fn(d_output_real, labels_real)
                 loss_real_d.backward()
 
                 loss_d_train += loss_real_d.detach().cpu().numpy() 
@@ -121,8 +124,8 @@ class GANmodel:
 
                 ### Update Generator ###
 
-                batch_fake_data = torch.randn(self.batch_size, self.g.input_dim, device=self.device)
-                labels_fake = torch.full((self.batch_size,), 1 ,  device=self.device)
+                batch_fake_data = torch.randn(len(batch_real), self.g.input_dim, device=self.device)
+                labels_fake = torch.full((len(batch_real), 1), 1. ,  device=self.device)
 
                 d_output = self.d(self.g(batch_fake_data))
                 loss_fake_g = loss_fn(d_output, labels_fake)
@@ -136,22 +139,22 @@ class GANmodel:
             self.g.eval()
             self.d.eval()
 
-            for batch_start in range(0,n_valid, self.batch_size):
+            for batch_start in range(0, n_valid, self.batch_size):
 
-                batch_real = validation_data[batch_start : batch_start + self.batch_size]
-                labels_real = torch.full((self.batch_size,), 1 ,  device=self.device)
+                batch_real = validation_data[batch_start : batch_start + self.batch_size].to(self.device)
+                labels_real = torch.full((len(batch_real), 1), 1. ,  device=self.device)
                 
-                batch_fake_data = torch.randn(self.batch_size, self.g.input_dim, device=self.device)
-                labels_fake_d = torch.full((self.batch_size,), 0 ,  device=self.device)
-                labels_fake_g = torch.full((self.batch_size,), 1 ,  device=self.device)
+                batch_fake_data = torch.randn(len(batch_real), self.g.input_dim, device=self.device)
+                labels_fake_d = torch.full((len(batch_real), 1), 0. ,  device=self.device)
+                labels_fake_g = torch.full((len(batch_real), 1), 1. ,  device=self.device)
 
                 with torch.no_grad():
                     batch_fake = self.g(batch_fake_data)
                     d_output_real = self.d(batch_real)
                     d_output_fake = self.d(batch_fake)
-                    loss_d_real = loss_fn(d_output_real , labels_real)
-                    loss_d_fake = loss_fn(d_output_fake , labels_fake_d)
-                    loss_g_fake = loss_fn(d_output_fake , labels_fake_g)
+                    loss_d_real = loss_fn(d_output_real, labels_real)
+                    loss_d_fake = loss_fn(d_output_fake, labels_fake_d)
+                    loss_g_fake = loss_fn(d_output_fake, labels_fake_g)
 
                     loss_d_val += (loss_d_real.detach().cpu().numpy() + loss_d_fake.detach().cpu().numpy())
                     loss_g_val += (loss_g_fake.detach().cpu().numpy())
@@ -167,7 +170,6 @@ class GANmodel:
             self.g_losses_val.append(loss_g_val/n_valid) 
 
 
-
     def drawsamples(self,N,get_tensor=False):
 
         random_latents = torch.randn(N, self.g.input_dim, device=self.device)
@@ -179,7 +181,4 @@ class GANmodel:
             
         else:
             return outputs.cpu().numpy()
-
-
-
 
