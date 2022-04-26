@@ -92,5 +92,23 @@ class StructuralCausalModel(nn.Module):
         else:
             return loss.mean()
 
+    ## TODO: Move into SCM class
+    def generate_z(self, x, y, c):
+        x_feat = self.text_featurizer(x)
+        z_hat_mu, z_hat_logvar = self.q_phi(x_feat, y, c)
+        z_hat = self.q_phi.sample(z_hat_mu, z_hat_logvar)
+        return z_hat
 
-    
+    ## TODO: Move into StructuralCausalModel
+    def predict(self, x, gan, Z_SAMPLE_COUNT=32, device='cuda'):
+        x_dup = torch.repeat_interleave(x, Z_SAMPLE_COUNT, dim=0)
+        z_samples = gan.drawsamples(N=len(x_dup), get_tensor=True)
+
+        # x_dup = x_dup.to(device)
+        # z_samples = z_samples.to(device)
+
+        with torch.no_grad():
+            x_feat = self.text_featurizer(x_dup)
+            y_pred_logits = self.pthetay_xz(x_feat, z_samples).reshape((x.size(0), Z_SAMPLE_COUNT, -1)).mean(dim=1)
+
+        return nn.functional.sigmoid(y_pred_logits)

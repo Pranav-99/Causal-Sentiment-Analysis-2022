@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
 class GeneratorNet(nn.Module): 
 
     def __init__(self,input_dim,hidden_dim,output_dim,): 
@@ -162,15 +163,17 @@ class GANmodel:
             g_scheduler.step(loss_g_val/n_valid)
             d_scheduler.step(loss_d_val/n_valid)
 
-
             self.d_losses_train.append(loss_d_train/n_train)
             self.g_losses_train.append(loss_g_train/n_train)
 
             self.d_losses_val.append(loss_d_val/n_valid)
             self.g_losses_val.append(loss_g_val/n_valid) 
 
+            print("Epoch {}:\nTrain dloss: {} gloss: {},\nValid dloss: {} gloss: {}\n".format(
+                epoch, self.d_losses_train[-1], self.g_losses_train[-1], self.d_losses_val[-1], self.g_losses_val[-1]))
 
-    def drawsamples(self,N,get_tensor=False):
+
+    def drawsamples(self, N, get_tensor=False):
 
         random_latents = torch.randn(N, self.g.input_dim, device=self.device)
         with torch.no_grad():
