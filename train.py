@@ -8,6 +8,10 @@ import torch.nn.functional as F
 import numpy as np
 import pickle
 from sklearn.metrics import accuracy_score
+import random
+from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
+
 
 
 def train_scm(X_train, y_train, c_train, model, optimizer, num_epochs=1, batch_size=256, lr=0.001):
@@ -15,13 +19,17 @@ def train_scm(X_train, y_train, c_train, model, optimizer, num_epochs=1, batch_s
     model.train()
     train_size = X_train.shape[0]
 
-    for epoch in range(num_epochs):
+    train_loss_meter = AverageMeter()
+    recon_loss_meter = AverageMeter()
+    y_xz_loss_meter = AverageMeter()
+    c_z_loss_meter = AverageMeter()
+    KL_loss_meter = AverageMeter()
 
-        train_loss_meter = AverageMeter()
-        recon_loss_meter = AverageMeter()
-        y_xz_loss_meter = AverageMeter()
-        c_z_loss_meter = AverageMeter()
-        KL_loss_meter = AverageMeter()
+    tb_writer = SummaryWriter(f'/content/runs/{datetime.now()}'.replace(' ', '_'))
+    tb_writer.add_text(f"hyperparams",
+                       "batch_size: {batch_size}, num_epochs: {num_epochs}, lr: {lr},"
+                       " model lambdas: {model.lambda_recon, model.lambda_y_xz, model.lambda_c_z, model.lambda_KL}")
+    for epoch in range(num_epochs):
 
         i = 0
 
@@ -49,14 +57,20 @@ def train_scm(X_train, y_train, c_train, model, optimizer, num_epochs=1, batch_s
             c_z_loss_meter.update(L_c_z.item(), (end_index-start_index))
             KL_loss_meter.update(L_KL.item(), (end_index-start_index))
 
+            tb_writer.add_scalar('train/loss', loss.item(), start_index)
+            tb_writer.add_scalar('train/recon_loss', L_recon.item(), start_index)
+            tb_writer.add_scalar('train/y_xz_loss', L_y_xz.item(), start_index)
+            tb_writer.add_scalar('train/c_z_loss', L_c_z.item(), start_index)
+            tb_writer.add_scalar('train/KL_loss', L_KL.item(), start_index)
+
             if(i % 100 == 0):
 
-                print("Epoch: {}, Iter: {}, Training Loss: {}".format(epoch, i, train_loss_meter.avg))
-                print(f"loss, L_recon, L_y_xz, L_c_z, L_KL: {loss.item(), L_recon.item(), L_y_xz.item(), L_c_z.item(), L_KL.item()}")
-                # print(", recon loss: {}".format(epoch, i, recon_loss_meter.avg), end='')
-                # print(", y_xz loss: {}".format(epoch, i, y_xz_loss_meter.avg), end='')
-                # print(", c_z loss: {}".format(epoch, i, c_z_loss_meter.avg), end='')
-                # print(", KL loss: {}".format(epoch, i, KL_loss_meter.avg))
+                print("Epoch: {}, Iter: {}, Training Loss: {}".format(epoch, i, train_loss_meter.avg), end='')
+                # print(f"loss, L_recon, L_y_xz, L_c_z, L_KL: {loss.item(), L_recon.item(), L_y_xz.item(), L_c_z.item(), L_KL.item()}")
+                print(", recon loss: {}".format(recon_loss_meter.avg), end='')
+                print(", y_xz loss: {}".format(y_xz_loss_meter.avg), end='')
+                print(", c_z loss: {}".format(c_z_loss_meter.avg), end='')
+                print(", KL loss: {}".format(KL_loss_meter.avg))
 
             i += 1
 
@@ -122,9 +136,12 @@ def main():
     confounder = ['user_pop', 'take_out']
 
     dataset_index = 1
-    # for dataset_index in range(1, 10):
-    if True:
+    for dataset_index in range(1, 10):
+    # if True:
         print("\n-------------\nDataset Bias {}\n\n".format(dataset_index))
+        torch.manual_seed(42)
+        np.random.seed(42)
+        random.seed(42)
 
         X_train, X_test, train_df, test_df = prepare_data(all_train_df, test_df, dataset_index)
 
@@ -136,11 +153,11 @@ def main():
         y_test_tensor = torch.from_numpy(test_df['label'].to_numpy()).unsqueeze(dim=1).float()
         c_test_tensor = torch.from_numpy(test_df[confounder].to_numpy()) #.unsqueeze(dim=1)
 
-        num_epochs = 4
-        batch_size = 256
+        num_epochs = 10
+        batch_size = 128
         lr = 0.001
 
-        model = StructuralCausalModel(c_dim=len(confounder)).cuda()
+        model = StructuralCausalModel(lambda_KL=0.5, c_dim=len(confounder)).cuda()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         train_scm(
@@ -168,6 +185,8 @@ def main():
         gan_config['batch_size'] = 64
 
         gan = GANmodel(gan_config)
+        z_dataset_train = torch.from_numpy(z_dataset_train)
+        z_dataset_test = torch.from_numpy(z_dataset_test)
         gan.train(z_dataset_train, z_dataset_test)
 
         pred_test = predict_dataset(model, X_test_tensor, gan)
@@ -176,6 +195,8 @@ def main():
 
         print("\nDataset Bias {}\n".format(dataset_index))      
         print("Accuracy: {}".format(accuracy_score(test_df['label'], y_pred)))
+
+        torch.save(model.state_dict(), f"scm_dataset_index={dataset_index}_.pt")
 
         print("\n\n-------------\n\n", dataset_index)
 

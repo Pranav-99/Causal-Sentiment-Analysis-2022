@@ -92,6 +92,40 @@ class StructuralCausalModel(nn.Module):
         else:
             return loss.mean()
 
+    def forward_evaluation(self, x, y, c, return_all_losses=False):
+        ''' returns losses '''
+        self.eval()
+        with torch.no_grad():
+            x_feat = self.text_featurizer(x)
+
+            z_hat_mu, z_hat_logvar = self.q_phi(x_feat, y, c)
+
+            ## TODO: Consider running with more z's per sample
+            z = self.q_phi.sample(z_hat_mu, z_hat_logvar)
+
+            y_hat_logits = self.pthetay_xz(x_feat, z)
+            x_feat_hat = self.pthetaxfeat_z(z)
+            c_hat_logits = self.pthetac_z(z)
+
+            L_recon = recon_loss_function(x_feat, x_feat_hat)
+            L_y_xz = self.cross_entropy_loss(y_hat_logits, y).squeeze(dim=1) # cross entropy
+            L_c_z = self.cross_entropy_loss(c_hat_logits, c).sum(dim=1) # cross entropy
+
+            L_KL = kl_loss_function(z_hat_mu, z_hat_logvar)
+
+            loss = self.lambda_recon * L_recon \
+                    + self.labmda_y_xz * L_y_xz \
+                    + self.lambda_c_z * L_c_z \
+                    + self.lambda_KL * L_KL
+
+        self.train()
+
+        if return_all_losses:
+            return loss.mean(), L_recon.mean(), L_y_xz.mean(), L_c_z.mean(), L_KL.mean()
+        else:
+            return loss.mean()
+
+
     ## TODO: Move into SCM class
     def generate_z(self, x, y, c):
         x_feat = self.text_featurizer(x)

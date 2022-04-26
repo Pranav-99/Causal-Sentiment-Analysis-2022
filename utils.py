@@ -1,5 +1,10 @@
 import torch
 
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from nltk.tokenize import wordpunct_tokenize
+
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -35,3 +40,24 @@ def recon_loss_function(x, x_hat):
 
 
 
+def prepare_data(all_train_df, test_df, ind=1):
+    
+    train_df = all_train_df[ind]
+    train_df = train_df.sample(frac=1)
+
+    train_df['text'] = train_df['text'].apply(lambda x: x.lower())
+    test_df['text'] = test_df['text'].apply(lambda x: x.lower())
+
+    train_df['text'] = train_df['text'].apply(lambda x: " ".join(wordpunct_tokenize(x)))
+    test_df['text'] = test_df['text'].apply(lambda x: " ".join(wordpunct_tokenize(x)))
+
+    tokenizer = Tokenizer(num_words=2000, lower=True, split=' ', filters='#%&()*+-/:;<=>@[\\]^_`{|}~\t\n')
+    tokenizer.fit_on_texts(train_df['text'].values)
+
+    X_train = tokenizer.texts_to_sequences(train_df['text'].values)
+    X_train = pad_sequences(X_train, maxlen=350)
+
+    X_test = tokenizer.texts_to_sequences(test_df['text'].values)
+    X_test = pad_sequences(X_test, maxlen=350)
+
+    return X_train, X_test, train_df, test_df
