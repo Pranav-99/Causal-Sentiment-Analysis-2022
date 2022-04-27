@@ -14,7 +14,7 @@ class GeneratorNet(nn.Module):
         self.layer1 = nn.Linear(input_dim , hidden_dim)
         self.layer2 = nn.Linear(hidden_dim , output_dim)
 
-    def forward(self,x):
+    def forward(self, x):
         out = F.relu(self.layer1(x))
         out = self.layer2(out) 
         return out
@@ -37,7 +37,7 @@ class DiscriminatorNet(nn.Module):
         return out
 
 
-class GANmodel: 
+class GANmodel:
 
     def __init__(self, gan_config):
 

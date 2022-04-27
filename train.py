@@ -135,14 +135,14 @@ def main():
 
     confounder = ['user_pop', 'take_out']
 
-    dataset_index = 1
+    # dataset_index = 1
     for dataset_index in range(1, 10):
     # if True:
-        print("\n-------------\nDataset Bias {}\n\n".format(dataset_index))
-        torch.manual_seed(42)
-        np.random.seed(42)
-        random.seed(42)
+        torch.manual_seed(0)
+        np.random.seed(0)
+        random.seed(0)
 
+        print("\n-------------\nDataset Bias {}\n\n".format(dataset_index))
         X_train, X_test, train_df, test_df = prepare_data(all_train_df, test_df, dataset_index)
 
         X_train_tensor = torch.from_numpy(X_train)
@@ -152,6 +152,10 @@ def main():
         X_test_tensor = torch.from_numpy(X_test)
         y_test_tensor = torch.from_numpy(test_df['label'].to_numpy()).unsqueeze(dim=1).float()
         c_test_tensor = torch.from_numpy(test_df[confounder].to_numpy()) #.unsqueeze(dim=1)
+
+        torch.manual_seed(0)
+        np.random.seed(0)
+        random.seed(0)
 
         num_epochs = 10
         batch_size = 128
@@ -179,10 +183,10 @@ def main():
         gan_config['d_output_dim'] = 1
         gan_config['g_lr'] = 0.001
         gan_config['d_lr'] = 0.001
-        gan_config['epochs'] = 50
-        gan_config['gamma'] = 0.01
+        gan_config['epochs'] = 1
+        gan_config['gamma'] = 1.0
 
-        gan_config['batch_size'] = 64
+        gan_config['batch_size'] = 256
 
         gan = GANmodel(gan_config)
         z_dataset_train = torch.from_numpy(z_dataset_train)
@@ -196,7 +200,9 @@ def main():
         print("\nDataset Bias {}\n".format(dataset_index))      
         print("Accuracy: {}".format(accuracy_score(test_df['label'], y_pred)))
 
-        torch.save(model.state_dict(), f"scm_dataset_index={dataset_index}_.pt")
+        torch.save(model.state_dict(), f"scm_dataset_index={dataset_index}.pt")
+        torch.save(gan.g.state_dict(), f"gan_generator_dataset_index={dataset_index}.pt")
+        torch.save(gan.d.state_dict(), f"gan_discriminator_dataset_index={dataset_index}.pt")
 
         print("\n\n-------------\n\n", dataset_index)
 
