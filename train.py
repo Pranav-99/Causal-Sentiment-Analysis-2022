@@ -176,7 +176,7 @@ def main():
 
         gan_config = {}
         gan_config['device'] = device
-        gan_config['g_input_dim'] = 4
+        gan_config['g_input_dim'] = 16
         gan_config['g_hidden_dim'] = 8
         gan_config['g_output_dim'] = 16
         gan_config['d_hidden_dim'] = 4
@@ -186,6 +186,8 @@ def main():
         gan_config['epochs'] = 1
         gan_config['gamma'] = 1.0
         gan_config['mode'] = 'LSGAN'
+        gan_config['disc_steps'] = 5
+        gan_config['g_nhidden'] = 2
 
         gan_config['batch_size'] = 256
 
