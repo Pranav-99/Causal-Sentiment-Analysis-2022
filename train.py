@@ -185,6 +185,7 @@ def main():
         gan_config['d_lr'] = 0.001
         gan_config['epochs'] = 1
         gan_config['gamma'] = 1.0
+        gan_config['mode'] = 'LSGAN'
 
         gan_config['batch_size'] = 256
 

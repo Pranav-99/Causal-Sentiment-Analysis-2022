@@ -58,6 +58,8 @@ class GANmodel:
         self.epochs = gan_config['epochs'] 
         self.gamma = gan_config['gamma']
         self.batch_size = gan_config['batch_size']
+        self.mode = gan_config['mode']
+        assert self.mode in {'GAN', 'LSGAN'}
 
 
     def train(self, train_data, validation_data):
@@ -70,7 +72,11 @@ class GANmodel:
 
         n_train = train_data.shape[0]
         n_valid = validation_data.shape[0]
-        loss_fn = nn.BCEWithLogitsLoss()
+        if self.mode == 'GAN':
+            loss_fn = nn.BCEWithLogitsLoss()
+        elif self.mode == 'LSGAN':
+            loss_fn = nn.MSELoss()
+
         g_optimizer = torch.optim.Adam(self.g.parameters(), lr=self.g_lr)
         d_optimizer = torch.optim.Adam(self.d.parameters(), lr=self.d_lr)
         g_scheduler = torch.optim.lr_scheduler.ExponentialLR(g_optimizer, gamma=self.gamma)
